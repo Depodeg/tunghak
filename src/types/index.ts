@@ -6,6 +6,11 @@ export type ChecklistItem = {
   hasPhoto: boolean;
   photoUrl?: string;
   notes?: string;
+  children?: ChecklistItem[]; // Support for nested items
+  condition?: {
+    dependsOn: string; // ID of the item this depends on
+    value: boolean; // The required value of the dependent item to show this
+  };
 };
 
 export type ChecklistSection = {
@@ -13,6 +18,15 @@ export type ChecklistSection = {
   title: string;
   items: ChecklistItem[];
   isExpanded: boolean;
+};
+
+export type Checklist = {
+  id: string;
+  name: string;
+  description?: string;
+  sections: ChecklistSection[];
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type WeatherCondition = {

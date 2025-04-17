@@ -1,13 +1,21 @@
 
-import { useState } from "react";
-import { ChecklistSection as ChecklistSectionType, ChecklistItem as ChecklistItemType } from "@/types";
+import { useState, useEffect } from "react";
+import { 
+  ChecklistSection as ChecklistSectionType, 
+  ChecklistItem as ChecklistItemType,
+  Checklist 
+} from "@/types";
 import Header from "@/components/Header";
 import ChecklistSection from "@/components/ChecklistSection";
 import WeatherCheck from "@/components/WeatherCheck";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Check, CloudSun, Download, Upload } from "lucide-react";
+import { Check, CloudSun, Download, Upload, FilePlus } from "lucide-react";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
+import ChecklistImport from "@/components/ChecklistImport";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { v4 as uuidv4 } from "uuid";
 
 const Index = () => {
   const [sections, setSections] = useState<ChecklistSectionType[]>([
@@ -426,7 +434,9 @@ const Index = () => {
       ]
     }
   ]);
-
+  
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  
   const handleToggleItem = (sectionId: string, itemId: string) => {
     setSections((prevSections) =>
       prevSections.map((section) => {
@@ -435,11 +445,39 @@ const Index = () => {
             ...section,
             items: section.items.map((item) => {
               if (item.id === itemId) {
-                return {
+                // Toggle this item
+                const updatedItem = {
                   ...item,
                   isCompleted: !item.isCompleted,
                 };
+                
+                // Also update any nested children if this item has them
+                if (updatedItem.children && updatedItem.children.length > 0) {
+                  updatedItem.children = updatedItem.children.map(child => ({
+                    ...child,
+                    isCompleted: updatedItem.isCompleted
+                  }));
+                }
+                
+                return updatedItem;
               }
+              
+              // Check if this item has any children that match the toggled ID
+              if (item.children && item.children.some(child => child.id === itemId)) {
+                return {
+                  ...item,
+                  children: item.children.map(child => {
+                    if (child.id === itemId) {
+                      return {
+                        ...child,
+                        isCompleted: !child.isCompleted
+                      };
+                    }
+                    return child;
+                  })
+                };
+              }
+              
               return item;
             }),
           };
@@ -462,7 +500,7 @@ const Index = () => {
       })
     );
   };
-
+  
   const handleAddPhoto = (sectionId: string, itemId: string, photoUrl: string) => {
     setSections((prevSections) =>
       prevSections.map((section) => {
@@ -470,6 +508,7 @@ const Index = () => {
           return {
             ...section,
             items: section.items.map((item) => {
+              // Check if this is the target item
               if (item.id === itemId) {
                 return {
                   ...item,
@@ -477,6 +516,24 @@ const Index = () => {
                   photoUrl,
                 };
               }
+              
+              // Check if the target is in children
+              if (item.children && item.children.some(child => child.id === itemId)) {
+                return {
+                  ...item,
+                  children: item.children.map(child => {
+                    if (child.id === itemId) {
+                      return {
+                        ...child,
+                        hasPhoto: true,
+                        photoUrl,
+                      };
+                    }
+                    return child;
+                  })
+                };
+              }
+              
               return item;
             }),
           };
@@ -494,12 +551,30 @@ const Index = () => {
           return {
             ...section,
             items: section.items.map((item) => {
+              // Check if this is the target item
               if (item.id === itemId) {
                 return {
                   ...item,
                   notes: note,
                 };
               }
+              
+              // Check if the target is in children
+              if (item.children && item.children.some(child => child.id === itemId)) {
+                return {
+                  ...item,
+                  children: item.children.map(child => {
+                    if (child.id === itemId) {
+                      return {
+                        ...child,
+                        notes: note,
+                      };
+                    }
+                    return child;
+                  })
+                };
+              }
+              
               return item;
             }),
           };
@@ -517,6 +592,10 @@ const Index = () => {
         items: section.items.map((item) => ({
           ...item,
           isCompleted: false,
+          children: item.children ? item.children.map(child => ({
+            ...child,
+            isCompleted: false,
+          })) : undefined
         })),
       }))
     );
@@ -532,7 +611,14 @@ const Index = () => {
           text: item.text,
           isCompleted: item.isCompleted,
           hasPhoto: item.hasPhoto,
-          notes: item.notes || ""
+          notes: item.notes || "",
+          children: item.children ? item.children.map(child => ({
+            text: child.text,
+            isCompleted: child.isCompleted,
+            hasPhoto: child.hasPhoto,
+            notes: child.notes || ""
+          })) : undefined,
+          condition: item.condition
         }))
       }))
     };
@@ -549,6 +635,47 @@ const Index = () => {
     document.body.removeChild(a);
     
     toast.success("Экспорт выполнен");
+  };
+  
+  const handleImport = (checklist: Checklist) => {
+    if (!checklist.sections || checklist.sections.length === 0) {
+      toast.error("Импортируемый чек-лист не содержит разделов");
+      return;
+    }
+    
+    setSections(checklist.sections);
+    setImportDialogOpen(false);
+    toast.success("Чек-лист импортирован успешно");
+  };
+  
+  // Enhanced to handle conditional items
+  const getVisibleItems = (items: ChecklistItemType[]) => {
+    return items.filter(item => {
+      if (!item.condition) return true;
+      
+      // Find the item this depends on
+      const dependentItem = findItemById(item.condition.dependsOn);
+      if (!dependentItem) return true; // If not found, just show it
+      
+      // Check if the condition matches
+      return dependentItem.isCompleted === item.condition.value;
+    });
+  };
+  
+  const findItemById = (itemId: string): ChecklistItemType | undefined => {
+    for (const section of sections) {
+      const item = section.items.find(item => item.id === itemId);
+      if (item) return item;
+      
+      // Check in children
+      for (const parentItem of section.items) {
+        if (parentItem.children) {
+          const childItem = parentItem.children.find(child => child.id === itemId);
+          if (childItem) return childItem;
+        }
+      }
+    }
+    return undefined;
   };
 
   return (
@@ -580,19 +707,49 @@ const Index = () => {
                 <Button 
                   variant="outline" 
                   size="sm"
+                  onClick={() => setImportDialogOpen(true)}
+                  className="flex items-center gap-1"
+                >
+                  <Upload className="h-4 w-4" /> Импорт
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
                   onClick={exportChecklist}
                   className="flex items-center gap-1"
                 >
                   <Download className="h-4 w-4" /> Экспорт
                 </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  asChild
+                  className="flex items-center gap-1"
+                >
+                  <Link to="/checklist-manager">
+                    <FilePlus className="h-4 w-4" /> Конструктор
+                  </Link>
+                </Button>
               </div>
             </div>
+            
+            <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Импорт чек-листа</DialogTitle>
+                </DialogHeader>
+                <ChecklistImport onImport={handleImport} />
+              </DialogContent>
+            </Dialog>
             
             <div className="space-y-4">
               {sections.map((section) => (
                 <ChecklistSection
                   key={section.id}
-                  section={section}
+                  section={{
+                    ...section,
+                    items: getVisibleItems(section.items) // Filter items based on conditions
+                  }}
                   onToggleItem={handleToggleItem}
                   onToggleExpand={handleToggleExpand}
                   onAddPhoto={handleAddPhoto}

@@ -1,9 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { 
   ChecklistSection as ChecklistSectionType, 
   ChecklistItem as ChecklistItemType,
-  Checklist 
+  Checklist,
+  WeatherCondition
 } from "@/types";
 import Header from "@/components/Header";
 import ChecklistSection from "@/components/ChecklistSection";
@@ -111,7 +111,7 @@ const Index = () => {
         },
         {
           id: "install-wings",
-          text: "Установить и закрепить крылья",
+          text: "Ус��ановить и закрепить крылья",
           isCompleted: false,
           hasPhoto: false
         },
@@ -436,6 +436,19 @@ const Index = () => {
   ]);
   
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [weatherData, setWeatherData] = useState<WeatherCondition | undefined>(undefined);
+  
+  useEffect(() => {
+    const savedWeather = localStorage.getItem('savedWeatherReport');
+    if (savedWeather) {
+      try {
+        const parsedWeather = JSON.parse(savedWeather);
+        setWeatherData(parsedWeather);
+      } catch (error) {
+        console.error('Error parsing saved weather data:', error);
+      }
+    }
+  }, []);
   
   const handleToggleItem = (sectionId: string, itemId: string) => {
     setSections((prevSections) =>
@@ -445,13 +458,11 @@ const Index = () => {
             ...section,
             items: section.items.map((item) => {
               if (item.id === itemId) {
-                // Toggle this item
                 const updatedItem = {
                   ...item,
                   isCompleted: !item.isCompleted,
                 };
                 
-                // Also update any nested children if this item has them
                 if (updatedItem.children && updatedItem.children.length > 0) {
                   updatedItem.children = updatedItem.children.map(child => ({
                     ...child,
@@ -462,7 +473,6 @@ const Index = () => {
                 return updatedItem;
               }
               
-              // Check if this item has any children that match the toggled ID
               if (item.children && item.children.some(child => child.id === itemId)) {
                 return {
                   ...item,
@@ -508,7 +518,6 @@ const Index = () => {
           return {
             ...section,
             items: section.items.map((item) => {
-              // Check if this is the target item
               if (item.id === itemId) {
                 return {
                   ...item,
@@ -517,7 +526,6 @@ const Index = () => {
                 };
               }
               
-              // Check if the target is in children
               if (item.children && item.children.some(child => child.id === itemId)) {
                 return {
                   ...item,
@@ -551,7 +559,6 @@ const Index = () => {
           return {
             ...section,
             items: section.items.map((item) => {
-              // Check if this is the target item
               if (item.id === itemId) {
                 return {
                   ...item,
@@ -559,7 +566,6 @@ const Index = () => {
                 };
               }
               
-              // Check if the target is in children
               if (item.children && item.children.some(child => child.id === itemId)) {
                 return {
                   ...item,
@@ -602,6 +608,10 @@ const Index = () => {
     toast.info("Чек-лист сброшен");
   };
 
+  const handleWeatherSave = (weather: WeatherCondition) => {
+    setWeatherData(weather);
+  };
+
   const exportChecklist = () => {
     const data = {
       date: new Date().toISOString(),
@@ -620,7 +630,8 @@ const Index = () => {
           })) : undefined,
           condition: item.condition
         }))
-      }))
+      })),
+      weather: weatherData
     };
     
     const jsonString = JSON.stringify(data, null, 2);
@@ -644,20 +655,23 @@ const Index = () => {
     }
     
     setSections(checklist.sections);
+    
+    if (checklist.weather) {
+      setWeatherData(checklist.weather);
+      localStorage.setItem('savedWeatherReport', JSON.stringify(checklist.weather));
+    }
+    
     setImportDialogOpen(false);
     toast.success("Чек-лист импортирован успешно");
   };
   
-  // Enhanced to handle conditional items
   const getVisibleItems = (items: ChecklistItemType[]) => {
     return items.filter(item => {
       if (!item.condition) return true;
       
-      // Find the item this depends on
       const dependentItem = findItemById(item.condition.dependsOn);
-      if (!dependentItem) return true; // If not found, just show it
+      if (!dependentItem) return true;
       
-      // Check if the condition matches
       return dependentItem.isCompleted === item.condition.value;
     });
   };
@@ -667,7 +681,6 @@ const Index = () => {
       const item = section.items.find(item => item.id === itemId);
       if (item) return item;
       
-      // Check in children
       for (const parentItem of section.items) {
         if (parentItem.children) {
           const childItem = parentItem.children.find(child => child.id === itemId);
@@ -748,7 +761,7 @@ const Index = () => {
                   key={section.id}
                   section={{
                     ...section,
-                    items: getVisibleItems(section.items) // Filter items based on conditions
+                    items: getVisibleItems(section.items)
                   }}
                   onToggleItem={handleToggleItem}
                   onToggleExpand={handleToggleExpand}
@@ -760,7 +773,7 @@ const Index = () => {
           </TabsContent>
           
           <TabsContent value="weather" className="mt-4">
-            <WeatherCheck />
+            <WeatherCheck onWeatherSave={handleWeatherSave} initialWeather={weatherData} />
           </TabsContent>
         </Tabs>
       </main>

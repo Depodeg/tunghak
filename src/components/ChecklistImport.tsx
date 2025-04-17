@@ -53,7 +53,8 @@ const ChecklistImport: React.FC<ChecklistImportProps> = ({ onImport }) => {
                 isExpanded: true
               })),
               createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
+              updatedAt: new Date().toISOString(),
+              weather: json.weather // Добавляем импорт погодных данных
             };
             
             onImport(importedChecklist);
@@ -92,7 +93,8 @@ const ChecklistImport: React.FC<ChecklistImportProps> = ({ onImport }) => {
             isExpanded: section.isExpanded !== undefined ? section.isExpanded : true
           })) : [],
           createdAt: json.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
+          weather: json.weather // Добавляем импорт погодных данных
         };
         
         onImport(importedChecklist);

@@ -27,6 +27,7 @@ export type Checklist = {
   sections: ChecklistSection[];
   createdAt: string;
   updatedAt: string;
+  weather?: WeatherCondition; // Добавляем погоду в чеклист
 };
 
 export type WeatherCondition = {
@@ -41,4 +42,5 @@ export type WeatherCondition = {
     lon: number;
     name?: string;
   };
+  savedAt?: string; // Время сохранения погодных данных
 };

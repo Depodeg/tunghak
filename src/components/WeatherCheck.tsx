@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { WeatherCondition } from "@/types";
 import { Wind, CloudRain, Eye, MapPin, RefreshCw, Save } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,9 +20,27 @@ const initialWeather: WeatherCondition = {
   forecast: "stable",
 };
 
-const WeatherCheck: React.FC = () => {
-  const [weather, setWeather] = useState<WeatherCondition>(initialWeather);
+interface WeatherCheckProps {
+  onWeatherSave?: (weather: WeatherCondition) => void;
+  initialWeather?: WeatherCondition;
+}
+
+const WeatherCheck: React.FC<WeatherCheckProps> = ({ onWeatherSave, initialWeather: propInitialWeather }) => {
+  const [weather, setWeather] = useState<WeatherCondition>(propInitialWeather || initialWeather);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Загружаем сохраненные данные о погоде при первом рендере
+  useEffect(() => {
+    const savedWeather = localStorage.getItem('savedWeatherReport');
+    if (savedWeather && !propInitialWeather) {
+      try {
+        const parsedWeather = JSON.parse(savedWeather);
+        setWeather(parsedWeather);
+      } catch (error) {
+        console.error('Error parsing saved weather data:', error);
+      }
+    }
+  }, [propInitialWeather]);
 
   const handleChange = (field: keyof WeatherCondition, value: string | number) => {
     setWeather((prev) => ({
@@ -57,12 +75,19 @@ const WeatherCheck: React.FC = () => {
   };
 
   const saveWeatherToReport = () => {
-    // Save weather data to localStorage for now
-    const savedWeather = {
+    // Сохраняем данные о погоде с меткой времени
+    const savedWeather: WeatherCondition = {
       ...weather,
       savedAt: new Date().toISOString()
     };
+    
     localStorage.setItem('savedWeatherReport', JSON.stringify(savedWeather));
+    
+    // Вызываем колбэк, если он предоставлен
+    if (onWeatherSave) {
+      onWeatherSave(savedWeather);
+    }
+    
     toast.success("Погодные условия сохранены в отчёте");
   };
 
@@ -212,7 +237,7 @@ const WeatherCheck: React.FC = () => {
             </div>
           </div>
           
-          {/* Summary of saved weather data */}
+          {/* Информация о данных для отчёта */}
           <div className="pt-4 mt-4 border-t">
             <h3 className="text-sm font-medium mb-2">Данные для отчёта</h3>
             <div className="grid grid-cols-2 gap-2 text-sm">
@@ -228,6 +253,11 @@ const WeatherCheck: React.FC = () => {
                 <CloudRain className="h-4 w-4 text-muted-foreground" />
                 <span>Осадки: {weather.precipitation === "none" ? "нет" : weather.precipitation === "light" ? "легкие" : "сильные"}</span>
               </div>
+              {weather.savedAt && (
+                <div className="col-span-2 text-xs text-muted-foreground">
+                  Сохранено: {new Date(weather.savedAt).toLocaleString()}
+                </div>
+              )}
             </div>
           </div>
         </div>

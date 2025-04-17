@@ -3,16 +3,22 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { v4 as uuidv4 } from "uuid";
 import { 
-  Button, 
-  Input, 
-  Textarea,
+  Button
+} from "@/components/ui/button";
+import { 
+  Input 
+} from "@/components/ui/input";
+import { 
+  Textarea 
+} from "@/components/ui/textarea";
+import {
   Form,
   FormField,
   FormItem,
   FormLabel,
   FormControl,
   FormMessage,
-} from "@/components/ui";
+} from "@/components/ui/form";
 import {
   Dialog,
   DialogContent,
@@ -270,6 +276,7 @@ const ChecklistBuilder: React.FC<ChecklistBuilderProps> = ({ initialChecklist, o
   // Item management
   const editSection = (sectionId: string) => {
     setEditingSectionId(sectionId);
+    setAddingSectionId("new"); // This opens the dialog
   };
 
   const addItem = (sectionId: string) => {
@@ -710,7 +717,10 @@ const ChecklistBuilder: React.FC<ChecklistBuilderProps> = ({ initialChecklist, o
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        onClick={() => setAddingNestedItemId(item.id) || setAddingItemSectionId(section.id)}
+                        onClick={() => {
+                          setAddingNestedItemId(item.id);
+                          setAddingItemSectionId(section.id);
+                        }}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>

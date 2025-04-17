@@ -22,4 +22,9 @@ export type WeatherCondition = {
   visibility: string;
   precipitation: string;
   forecast: string;
+  location?: {
+    lat: number;
+    lon: number;
+    name?: string;
+  };
 };

@@ -1,13 +1,16 @@
 
 import React, { useState } from "react";
 import { WeatherCondition } from "@/types";
-import { Wind, CloudRain, Eye, AlertTriangle, Check } from "lucide-react";
+import { Wind, CloudRain, Eye, AlertTriangle, Check, MapPin, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "sonner";
+import { fetchWeatherData, getCurrentLocation } from "@/services/weatherService";
 
 const initialWeather: WeatherCondition = {
   windSpeed: 0,
@@ -21,6 +24,7 @@ const initialWeather: WeatherCondition = {
 const WeatherCheck: React.FC = () => {
   const [weather, setWeather] = useState<WeatherCondition>(initialWeather);
   const [isAssessed, setIsAssessed] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (field: keyof WeatherCondition, value: string | number) => {
     setWeather((prev) => ({
@@ -31,6 +35,33 @@ const WeatherCheck: React.FC = () => {
 
   const assessWeather = () => {
     setIsAssessed(true);
+  };
+
+  const fetchWeatherDataFromCurrentLocation = async () => {
+    setIsLoading(true);
+    try {
+      const position = await getCurrentLocation();
+      const { latitude: lat, longitude: lon } = position.coords;
+      
+      toast.info("Загрузка метеоданных...");
+      
+      const weatherData = await fetchWeatherData(lat, lon);
+      
+      setWeather(weatherData);
+      
+      toast.success(
+        weatherData.location?.name
+          ? `Метеоданные для ${weatherData.location.name} загружены`
+          : "Метеоданные загружены"
+      );
+      
+      setIsAssessed(true);
+    } catch (error) {
+      console.error("Error fetching weather data:", error);
+      toast.error("Ошибка при загрузке метеоданных");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const hasWarnings = 
@@ -53,6 +84,30 @@ const WeatherCheck: React.FC = () => {
         <CardTitle className="flex items-center gap-2">
           <Wind className="h-5 w-5 text-sigma-primary" />
           Оценка погодных условий
+          <div className="flex-1"></div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex items-center gap-1 ml-auto"
+                  onClick={fetchWeatherDataFromCurrentLocation}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <MapPin className="h-4 w-4" />
+                  )}
+                  {weather.location?.name || "Получить метеоданные"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Загрузить текущие метеоданные по вашему местоположению</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </CardTitle>
       </CardHeader>
       <CardContent>

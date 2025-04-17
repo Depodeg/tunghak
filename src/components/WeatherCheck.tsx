@@ -1,14 +1,13 @@
 
 import React, { useState } from "react";
 import { WeatherCondition } from "@/types";
-import { Wind, CloudRain, Eye, AlertTriangle, Check, MapPin, RefreshCw } from "lucide-react";
+import { Wind, CloudRain, Eye, MapPin, RefreshCw, Save } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { fetchWeatherData, getCurrentLocation } from "@/services/weatherService";
 
@@ -23,7 +22,6 @@ const initialWeather: WeatherCondition = {
 
 const WeatherCheck: React.FC = () => {
   const [weather, setWeather] = useState<WeatherCondition>(initialWeather);
-  const [isAssessed, setIsAssessed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (field: keyof WeatherCondition, value: string | number) => {
@@ -31,10 +29,6 @@ const WeatherCheck: React.FC = () => {
       ...prev,
       [field]: value,
     }));
-  };
-
-  const assessWeather = () => {
-    setIsAssessed(true);
   };
 
   const fetchWeatherDataFromCurrentLocation = async () => {
@@ -54,8 +48,6 @@ const WeatherCheck: React.FC = () => {
           ? `Метеоданные для ${weatherData.location.name} загружены`
           : "Метеоданные загружены"
       );
-      
-      setIsAssessed(true);
     } catch (error) {
       console.error("Error fetching weather data:", error);
       toast.error("Ошибка при загрузке метеоданных");
@@ -64,50 +56,67 @@ const WeatherCheck: React.FC = () => {
     }
   };
 
-  const hasWarnings = 
-    weather.windSpeed > 8 || 
-    weather.windGusts > 12 || 
-    weather.visibility !== "good" || 
-    weather.precipitation !== "none" || 
-    weather.forecast === "worsening";
-
-  const hasDangers = 
-    weather.windSpeed >= 10 || 
-    weather.windGusts >= 15 || 
-    weather.windDirection === "crosswind" || 
-    weather.visibility === "poor" || 
-    weather.precipitation !== "none";
+  const saveWeatherToReport = () => {
+    // Save weather data to localStorage for now
+    const savedWeather = {
+      ...weather,
+      savedAt: new Date().toISOString()
+    };
+    localStorage.setItem('savedWeatherReport', JSON.stringify(savedWeather));
+    toast.success("Погодные условия сохранены в отчёте");
+  };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Wind className="h-5 w-5 text-sigma-primary" />
-          Оценка погодных условий
+          Погодные условия
           <div className="flex-1"></div>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="flex items-center gap-1 ml-auto"
-                  onClick={fetchWeatherDataFromCurrentLocation}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <MapPin className="h-4 w-4" />
-                  )}
-                  {weather.location?.name || "Получить метеоданные"}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Загрузить текущие метеоданные по вашему местоположению</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <div className="flex gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex items-center gap-1"
+                    onClick={fetchWeatherDataFromCurrentLocation}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <MapPin className="h-4 w-4" />
+                    )}
+                    {weather.location?.name || "Получить метеоданные"}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Загрузить текущие метеоданные по вашему местоположению</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="flex items-center gap-1"
+                    onClick={saveWeatherToReport}
+                  >
+                    <Save className="h-4 w-4" />
+                    Сохранить в отчёт
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Сохранить текущие погодные условия в отчёт</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -202,43 +211,25 @@ const WeatherCheck: React.FC = () => {
               </Select>
             </div>
           </div>
-
-          <Button 
-            className="w-full" 
-            onClick={assessWeather}
-          >
-            Оценить условия
-          </Button>
-
-          {isAssessed && hasDangers && (
-            <Alert variant="destructive" className="mt-4">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Опасные условия!</AlertTitle>
-              <AlertDescription>
-                Рекомендуется отложить полет из-за неблагоприятных погодных условий.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {isAssessed && !hasDangers && hasWarnings && (
-            <Alert className="mt-4 border-sigma-warning bg-orange-50">
-              <AlertTriangle className="h-4 w-4 text-sigma-warning" />
-              <AlertTitle className="text-sigma-warning">Предупреждение</AlertTitle>
-              <AlertDescription>
-                Обратите внимание на пограничные погодные условия. Будьте осторожны.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {isAssessed && !hasDangers && !hasWarnings && (
-            <Alert className="mt-4 border-sigma-success bg-green-50">
-              <Check className="h-4 w-4 text-sigma-success" />
-              <AlertTitle className="text-sigma-success">Подходящие условия</AlertTitle>
-              <AlertDescription>
-                Погодные условия подходят для выполнения полета.
-              </AlertDescription>
-            </Alert>
-          )}
+          
+          {/* Summary of saved weather data */}
+          <div className="pt-4 mt-4 border-t">
+            <h3 className="text-sm font-medium mb-2">Данные для отчёта</h3>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="flex items-center gap-2">
+                <Wind className="h-4 w-4 text-muted-foreground" />
+                <span>Ветер: {weather.windSpeed} м/с ({weather.windDirection === "headwind" ? "встречный" : weather.windDirection === "tailwind" ? "попутный" : "боковой"})</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Eye className="h-4 w-4 text-muted-foreground" />
+                <span>Видимость: {weather.visibility === "good" ? "хорошая" : weather.visibility === "moderate" ? "средняя" : "плохая"}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CloudRain className="h-4 w-4 text-muted-foreground" />
+                <span>Осадки: {weather.precipitation === "none" ? "нет" : weather.precipitation === "light" ? "легкие" : "сильные"}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
